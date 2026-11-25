@@ -147,9 +147,10 @@ jobs:
           echo "PASS: all 34 SQL files applied and all 31 post-migration contract scripts completed, including PR #117 cohort transitions."
           echo "Note: security_contract.sql was also run immediately after migration 006."
 
-      - name: Checkout runner verification scripts
+      - name: Checkout runner verification scripts from the selected workflow ref
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
+          ref: ${{ github.ref }}
           path: Runner
           persist-credentials: false
 

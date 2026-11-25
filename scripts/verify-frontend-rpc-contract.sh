@@ -20,6 +20,25 @@ cleanup() {
   psql "$DB_URL" -X -v ON_ERROR_STOP=1 <<'SQL'
 BEGIN;
 
+-- Remove synthetic identity-security records before deleting their Auth users.
+DELETE FROM auth.sessions
+WHERE user_id IN (
+  '61000000-0000-4000-8000-000000000001',
+  '61000000-0000-4000-8000-000000000002',
+  '61000000-0000-4000-8000-000000000003',
+  '61000000-0000-4000-8000-000000000004',
+  '61000000-0000-4000-8000-000000000005'
+);
+
+DELETE FROM auth.audit_log_entries
+WHERE coalesce(payload ->> 'actor_id', payload ->> 'user_id') IN (
+  '61000000-0000-4000-8000-000000000001',
+  '61000000-0000-4000-8000-000000000002',
+  '61000000-0000-4000-8000-000000000003',
+  '61000000-0000-4000-8000-000000000004',
+  '61000000-0000-4000-8000-000000000005'
+);
+
 -- The legacy Auth bootstrap still creates public.wallets as well as V2 wallets.
 -- Delete both explicitly; public.wallets also RESTRICTs deletion of public.profiles.
 DELETE FROM public.wallets
@@ -114,6 +133,24 @@ BEGIN
       '61000000-0000-4000-8000-000000000004',
       '61000000-0000-4000-8000-000000000005'
     )
+  ) OR EXISTS (
+    SELECT 1 FROM auth.sessions
+    WHERE user_id IN (
+      '61000000-0000-4000-8000-000000000001',
+      '61000000-0000-4000-8000-000000000002',
+      '61000000-0000-4000-8000-000000000003',
+      '61000000-0000-4000-8000-000000000004',
+      '61000000-0000-4000-8000-000000000005'
+    )
+  ) OR EXISTS (
+    SELECT 1 FROM auth.audit_log_entries
+    WHERE coalesce(payload ->> 'actor_id', payload ->> 'user_id') IN (
+      '61000000-0000-4000-8000-000000000001',
+      '61000000-0000-4000-8000-000000000002',
+      '61000000-0000-4000-8000-000000000003',
+      '61000000-0000-4000-8000-000000000004',
+      '61000000-0000-4000-8000-000000000005'
+    )
   ) THEN
     RAISE EXCEPTION 'Synthetic frontend RPC test identities were not fully cleaned up';
   END IF;
@@ -151,6 +188,19 @@ INSERT INTO rebuild_v2.user_roles(user_id,role) VALUES
   ('61000000-0000-4000-8000-000000000003','admin'),
   ('61000000-0000-4000-8000-000000000004','financial'),
   ('61000000-0000-4000-8000-000000000005','support');
+
+-- Seed one private session and one private activity event for each of two
+-- authenticated identities. The RPC results must never cross these markers.
+INSERT INTO auth.sessions
+  (id,user_id,created_at,updated_at,refreshed_at,not_after,user_agent,ip,aal)
+VALUES
+  ('62000000-0000-4000-8000-000000000001','61000000-0000-4000-8000-000000000001',now(),now(),now(),now()+interval '1 day','runner-user-one','192.0.2.11','aal1'),
+  ('62000000-0000-4000-8000-000000000002','61000000-0000-4000-8000-000000000002',now(),now(),now(),now()+interval '1 day','runner-user-two','192.0.2.12','aal1');
+
+INSERT INTO auth.audit_log_entries(id,payload,created_at,ip_address)
+VALUES
+  ('63000000-0000-4000-8000-000000000001',jsonb_build_object('actor_id','61000000-0000-4000-8000-000000000001','action','runner_identity_activity_user_one'),now(),'192.0.2.11'),
+  ('63000000-0000-4000-8000-000000000002',jsonb_build_object('actor_id','61000000-0000-4000-8000-000000000002','action','runner_identity_activity_user_two'),now(),'192.0.2.12');
 SQL
 
 jwt_for() {
@@ -240,19 +290,37 @@ expect_status 403 "$status" "Support is denied the Admin role-request RPC"
 status="$(request_status "$admin_jwt" POST "rpc/get_developer_feedback" content '{}')"
 expect_status 403 "$status" "Admin without Developer role is denied the Developer feedback RPC"
 
-# The two identity security RPCs are still legacy public-schema functions.
-# Their public calls must work; the V2 schema must not pretend to provide them yet.
-status="$(request_status "$tester_jwt" POST "rpc/get_my_active_sessions" public '{}')"
-expect_status 200 "$status" "Legacy public get_my_active_sessions is callable"
-
-status="$(request_status "$tester_jwt" POST "rpc/get_my_security_activity" public '{"p_limit":30}')"
-expect_status 200 "$status" "Legacy public get_my_security_activity is callable"
-
+# Identity-security RPCs must work in V2 and return only the caller's rows.
 status="$(request_status "$tester_jwt" POST "rpc/get_my_active_sessions" content '{}')"
-expect_status 404 "$status" "V2 get_my_active_sessions remains a documented migration gap"
+expect_status 200 "$status" "Tester can call V2 get_my_active_sessions"
+jq -e 'any(.[]; .id == "62000000-0000-4000-8000-000000000001") and all(.[]; .id != "62000000-0000-4000-8000-000000000002")' "$RUNNER_TEMP/rpc-role-response.json" >/dev/null
+echo "PASS: Tester session results contain only the tester's session"
+
+status="$(request_status "$developer_jwt" POST "rpc/get_my_active_sessions" content '{}')"
+expect_status 200 "$status" "Developer can call V2 get_my_active_sessions"
+jq -e 'any(.[]; .id == "62000000-0000-4000-8000-000000000002") and all(.[]; .id != "62000000-0000-4000-8000-000000000001")' "$RUNNER_TEMP/rpc-role-response.json" >/dev/null
+echo "PASS: Developer session results contain only the developer's session"
 
 status="$(request_status "$tester_jwt" POST "rpc/get_my_security_activity" content '{"p_limit":30}')"
-expect_status 404 "$status" "V2 get_my_security_activity remains a documented migration gap"
+expect_status 200 "$status" "Tester can call V2 get_my_security_activity"
+jq -e 'any(.[]; .event == "runner_identity_activity_user_one") and all(.[]; .event != "runner_identity_activity_user_two")' "$RUNNER_TEMP/rpc-role-response.json" >/dev/null
+echo "PASS: Tester activity results contain only the tester's event"
+
+status="$(request_status "$developer_jwt" POST "rpc/get_my_security_activity" content '{"p_limit":30}')"
+expect_status 200 "$status" "Developer can call V2 get_my_security_activity"
+jq -e 'any(.[]; .event == "runner_identity_activity_user_two") and all(.[]; .event != "runner_identity_activity_user_one")' "$RUNNER_TEMP/rpc-role-response.json" >/dev/null
+echo "PASS: Developer activity results contain only the developer's event"
+
+# Anonymous callers must not execute either V2 identity-security RPC.
+for rpc in get_my_active_sessions get_my_security_activity; do
+  status="$(request_status "$ANON_KEY" POST "rpc/$rpc" content '{}')"
+  if [[ "$status" == "200" ]]; then
+    echo "::error::Anonymous role unexpectedly executed rebuild_v2.$rpc"
+    cat "$RUNNER_TEMP/rpc-role-response.json"
+    exit 1
+  fi
+  echo "PASS: Anonymous role denied rebuild_v2.$rpc (HTTP $status)"
+done
 
 # Verify that PostgREST exposes rebuild_v2 but not the private implementation schema.
 status="$(request_status "$tester_jwt" GET "profiles?select=id&limit=0" accept '')"
@@ -269,4 +337,4 @@ if [[ "$private_status" != "406" ]]; then
 fi
 echo "PASS: rebuild_v2_private remains unexposed to PostgREST"
 
-echo "PASS: all 47 frontend RPC names accounted for (45 V2 + 2 legacy public); 2 V2 route gaps are explicitly documented."
+echo "PASS: all 47 frontend RPC names are covered in rebuild_v2, including per-user identity isolation checks."

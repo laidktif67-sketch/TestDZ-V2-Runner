@@ -1,0 +1,181 @@
+name: TestDZ V2 isolated verification
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: testdz-v2-isolated-verification
+  cancel-in-progress: false
+
+jobs:
+  database-contracts:
+    name: Apply 34 SQL files and run database contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Validate private repository read token
+        shell: bash
+        env:
+          TESTDZ_READ_TOKEN: ${{ secrets.TESTDZ_READ_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${TESTDZ_READ_TOKEN}" ]]; then
+            echo "::error::Missing TESTDZ_READ_TOKEN. Add a fine-grained read-only token as a repository Actions secret."
+            exit 1
+          fi
+
+      - name: Checkout exact TestDZ candidate commit
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: laidktif67-sketch/TestDZ
+          ref: d9e01eeb7d6a23a6491241a8f6cfd22d0266193a
+          token: ${{ secrets.TESTDZ_READ_TOKEN }}
+          path: TestDZ
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Verify checked-out commit
+        shell: bash
+        working-directory: TestDZ
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          expected="d9e01eeb7d6a23a6491241a8f6cfd22d0266193a"
+          test "$actual" = "$expected"
+          echo "Verified candidate commit: $actual"
+
+      - name: Set up Supabase CLI
+        uses: supabase/setup-cli@v3
+        with:
+          version: 3.2.0
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-client
+
+      - name: Start disposable local Supabase stack
+        working-directory: TestDZ
+        run: supabase start -x studio,edge-runtime,imgproxy,logflare,vector
+
+      - name: Apply candidate SQL and run all V2 contracts
+        shell: bash
+        working-directory: TestDZ
+        run: |
+          set -euo pipefail
+
+          supabase status --output env > "$RUNNER_TEMP/supabase.env"
+          set -a
+          source "$RUNNER_TEMP/supabase.env"
+          set +a
+          test -n "${DB_URL:-}" || { echo "::error::Supabase CLI did not export DB_URL"; exit 1; }
+
+          scripts=(supabase/rebuild-v2/[0-9][0-9][0-9]_*.sql)
+          if [[ "${#scripts[@]}" -ne 34 ]]; then
+            echo "::error::Expected 34 candidate SQL scripts; found ${#scripts[@]}"
+            exit 1
+          fi
+
+          for script in "${scripts[@]}"; do
+            echo "::group::Apply $script"
+            psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$script"
+            if [[ "$script" == "supabase/rebuild-v2/006_storage_policies.sql" ]]; then
+              echo "::group::Phase-one security contract"
+              psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f supabase/rebuild-v2/tests/security_contract.sql
+              echo "::endgroup::"
+            fi
+            echo "::endgroup::"
+          done
+
+          contracts=(
+            supabase/rebuild-v2/tests/final_state_contract.sql
+            supabase/rebuild-v2/tests/catalog_fingerprint.sql
+            supabase/rebuild-v2/tests/catalog_difference_details.sql
+            supabase/rebuild-v2/tests/010_security_definer_boundary_contract.sql
+            supabase/rebuild-v2/tests/003_app_lifecycle_contract.sql
+            supabase/rebuild-v2/tests/004_profile_contract.sql
+            supabase/rebuild-v2/tests/005_developer_lifecycle_contract.sql
+            supabase/rebuild-v2/tests/006_test_media_assets_contract.sql
+            supabase/rebuild-v2/tests/007_tester_workflow_contract.sql
+            supabase/rebuild-v2/tests/008_developer_feedback_privacy_contract.sql
+            supabase/rebuild-v2/tests/009_wallet_idempotency_contract.sql
+            supabase/rebuild-v2/tests/011_notification_recipient_roles_contract.sql
+            supabase/rebuild-v2/tests/012_notification_outbox_retry_contract.sql
+            supabase/rebuild-v2/tests/013_wallet_role_boundary_contract.sql
+            supabase/rebuild-v2/tests/014_onboarding_developer_approval_contract.sql
+            supabase/rebuild-v2/tests/015_admin_role_request_management_contract.sql
+            supabase/rebuild-v2/tests/016_admin_role_grant_contract.sql
+            supabase/rebuild-v2/tests/017_support_ticket_role_boundary_contract.sql
+            supabase/rebuild-v2/tests/018_audit_event_append_only_contract.sql
+            supabase/rebuild-v2/tests/019_app_icon_storage_boundary_contract.sql
+            supabase/rebuild-v2/tests/020_support_ticket_audited_workflow_contract.sql
+            supabase/rebuild-v2/tests/021_fraud_fail_closed_contract.sql
+            supabase/rebuild-v2/tests/022_reports_disputes_fail_closed_contract.sql
+            supabase/rebuild-v2/tests/023_refunds_fail_closed_contract.sql
+            supabase/rebuild-v2/tests/024_report_evidence_metadata_contract.sql
+            supabase/rebuild-v2/tests/025_six_step_test_config_contract.sql
+            supabase/rebuild-v2/tests/026_developer_test_monitoring_privacy_contract.sql
+            supabase/rebuild-v2/tests/027_role_explicit_support_ticket_creation_contract.sql
+            supabase/rebuild-v2/tests/028_developer_test_invitations_contract.sql
+            supabase/rebuild-v2/tests/029_developer_test_edit_contract.sql
+          )
+
+          for contract in "${contracts[@]}"; do
+            test -f "$contract"
+            echo "::group::Run $contract"
+            psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$contract"
+            echo "::endgroup::"
+          done
+
+          echo "PASS: all 34 SQL files applied and all 30 post-migration contract scripts completed."
+          echo "Note: security_contract.sql was also run immediately after migration 006."
+
+      - name: Stop disposable local Supabase stack
+        if: always()
+        working-directory: TestDZ
+        run: supabase stop --no-backup
+
+  edge-function-typecheck:
+    name: Type-check candidate Edge Functions
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Validate private repository read token
+        shell: bash
+        env:
+          TESTDZ_READ_TOKEN: ${{ secrets.TESTDZ_READ_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${TESTDZ_READ_TOKEN}" ]]; then
+            echo "::error::Missing TESTDZ_READ_TOKEN. Add the same repository Actions secret."
+            exit 1
+          fi
+
+      - name: Checkout exact TestDZ candidate commit
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: laidktif67-sketch/TestDZ
+          ref: d9e01eeb7d6a23a6491241a8f6cfd22d0266193a
+          token: ${{ secrets.TESTDZ_READ_TOKEN }}
+          path: TestDZ
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Verify checked-out commit
+        working-directory: TestDZ
+        run: |
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "d9e01eeb7d6a23a6491241a8f6cfd22d0266193a"
+          echo "Verified candidate commit: $actual"
+
+      - name: Set up Deno
+        uses: denoland/setup-deno@e95548e56dfa95d4e1a28d6f422fafe75c4c26fb
+        with:
+          deno-version: 2.9.8
+
+      - name: Type-check notification and invitation Edge Functions
+        working-directory: TestDZ
+        run: deno check --no-lock --node-modules-dir=auto supabase/functions/dispatch-notifications/index.ts supabase/functions/developer-invitations/index.ts

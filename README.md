@@ -6,7 +6,7 @@ A separate, disposable GitHub Actions runner for verifying the TestDZ V2 databas
 
 - This repository is public. Never commit credentials, access tokens, Supabase keys, database URLs, or production data here.
 - The workflow is manual-only (`workflow_dispatch`). It does not run for pushes or pull requests.
-- It checks out only TestDZ commit `d9e01eeb7d6a23a6491241a8f6cfd22d0266193a`.
+- It checks out TestDZ candidate commit `d9e01eeb7d6a23a6491241a8f6cfd22d0266193a` and separately fetches only the PR #117 cohort contract from exact commit `b99d846a455549b468a8a1624fe3dbd1f7db1ee2`.
 - It starts a disposable local Supabase stack on a GitHub-hosted Ubuntu runner. It does not connect to the user's Supabase project.
 - The workflow requests read-only repository contents access. It does not write to TestDZ, run production migrations, or deploy the app.
 - The database job stops the local Supabase stack even when a test fails.
@@ -34,10 +34,11 @@ After the secret is saved:
 3. Press **Run workflow**, choose `main`, and confirm.
 
 The workflow has two jobs:
-- Apply the 34 V2 SQL files to a fresh local Supabase database and execute the listed SQL contracts (including the phase-one security contract).
-- Type-check the notification and developer-invitation Edge Functions with the pinned Deno version.
 
-A green run is evidence only for this exact candidate commit and these checks. It does not cover the separate PR #117 cohort-transition contract, production deployment, frontend runtime behavior, or a full end-to-end application test. Those remain separate verification gates.
+- **Database and integration contracts:** apply all 34 V2 SQL files to a fresh local Supabase database; run 31 post-migration SQL contracts plus the phase-one security contract; include the PR #117 cohort-transition test from its exact reviewed SHA; verify the 45 unique frontend RPC names and named arguments (49 call sites); check authenticated-versus-anonymous function grants; and exercise representative PostgREST calls and role boundaries for Tester, Developer, Admin, Financial, and Support. The PostgREST smoke checks also confirm that `rebuild_v2` is exposed and `rebuild_v2_private` is not.
+- **Edge Function type-check:** type-check the notification and developer-invitation functions with the pinned Deno version.
+
+A green run is evidence only for the pinned candidate and the listed checks. It is not a complete end-to-end test of every frontend page or every RPC with realistic records, does not compare candidate data with production, and does not approve a production cutover or deployment.
 
 ## If the workflow fails
 

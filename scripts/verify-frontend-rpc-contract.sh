@@ -79,7 +79,7 @@ request_status() {
   if [[ "$method" == "POST" ]]; then
     headers+=(-H "Content-Type: application/json")
     curl --silent --show-error --output "$output" --write-out "%{http_code}" \
-      -X POST "${headers[@]}" "${headers[@]}" "$API_URL/rest/v1/$path" --data "$body"
+      -X POST "${headers[@]}" "$API_URL/rest/v1/$path" --data "$body"
   else
     curl --silent --show-error --output "$output" --write-out "%{http_code}" \
       "${headers[@]}" "$API_URL/rest/v1/$path"

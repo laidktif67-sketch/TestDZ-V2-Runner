@@ -6,7 +6,7 @@ set -euo pipefail
 : "${ANON_KEY:?ANON_KEY is required}"
 : "${JWT_SECRET:?JWT_SECRET is required}"
 
-psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$GITHUB_WORKSPACE/tests/frontend_rpc_contract.sql"
+psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$GITHUB_WORKSPACE/Runner/tests/frontend_rpc_contract.sql"
 
 ids=(
   "61000000-0000-4000-8000-000000000001"

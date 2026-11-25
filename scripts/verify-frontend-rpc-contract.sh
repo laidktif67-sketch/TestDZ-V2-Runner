@@ -18,6 +18,17 @@ ids=(
 
 cleanup() {
   psql "$DB_URL" -X -v ON_ERROR_STOP=1 <<'SQL'
+-- The legacy Auth bootstrap still creates public.wallets as well as V2 wallets.
+-- Delete both explicitly; public.wallets also RESTRICTs deletion of public.profiles.
+DELETE FROM public.wallets
+WHERE user_id IN (
+  '61000000-0000-4000-8000-000000000001',
+  '61000000-0000-4000-8000-000000000002',
+  '61000000-0000-4000-8000-000000000003',
+  '61000000-0000-4000-8000-000000000004',
+  '61000000-0000-4000-8000-000000000005'
+);
+
 DELETE FROM rebuild_v2.wallets
 WHERE user_id IN (
   '61000000-0000-4000-8000-000000000001',
@@ -50,6 +61,24 @@ BEGIN
   ) OR EXISTS (
     SELECT 1 FROM rebuild_v2.profiles
     WHERE id IN (
+      '61000000-0000-4000-8000-000000000001',
+      '61000000-0000-4000-8000-000000000002',
+      '61000000-0000-4000-8000-000000000003',
+      '61000000-0000-4000-8000-000000000004',
+      '61000000-0000-4000-8000-000000000005'
+    )
+  ) OR EXISTS (
+    SELECT 1 FROM public.profiles
+    WHERE id IN (
+      '61000000-0000-4000-8000-000000000001',
+      '61000000-0000-4000-8000-000000000002',
+      '61000000-0000-4000-8000-000000000003',
+      '61000000-0000-4000-8000-000000000004',
+      '61000000-0000-4000-8000-000000000005'
+    )
+  ) OR EXISTS (
+    SELECT 1 FROM public.wallets
+    WHERE user_id IN (
       '61000000-0000-4000-8000-000000000001',
       '61000000-0000-4000-8000-000000000002',
       '61000000-0000-4000-8000-000000000003',
@@ -128,6 +157,8 @@ request_status() {
     headers+=(-H "Content-Profile: rebuild_v2")
   elif [[ "$profile_header" == "accept" ]]; then
     headers+=(-H "Accept-Profile: rebuild_v2")
+  elif [[ "$profile_header" == "public" ]]; then
+    headers+=(-H "Content-Profile: public")
   fi
   if [[ "$method" == "POST" ]]; then
     headers+=(-H "Content-Type: application/json")
@@ -187,6 +218,20 @@ expect_status 403 "$status" "Support is denied the Admin role-request RPC"
 status="$(request_status "$admin_jwt" POST "rpc/get_developer_feedback" content '{}')"
 expect_status 403 "$status" "Admin without Developer role is denied the Developer feedback RPC"
 
+# The two identity security RPCs are still legacy public-schema functions.
+# Their public calls must work; the V2 schema must not pretend to provide them yet.
+status="$(request_status "$tester_jwt" POST "rpc/get_my_active_sessions" public '{}')"
+expect_status 200 "$status" "Legacy public get_my_active_sessions is callable"
+
+status="$(request_status "$tester_jwt" POST "rpc/get_my_security_activity" public '{"p_limit":30}')"
+expect_status 200 "$status" "Legacy public get_my_security_activity is callable"
+
+status="$(request_status "$tester_jwt" POST "rpc/get_my_active_sessions" content '{}')"
+expect_status 404 "$status" "V2 get_my_active_sessions remains a documented migration gap"
+
+status="$(request_status "$tester_jwt" POST "rpc/get_my_security_activity" content '{"p_limit":30}')"
+expect_status 404 "$status" "V2 get_my_security_activity remains a documented migration gap"
+
 # Verify that PostgREST exposes rebuild_v2 but not the private implementation schema.
 status="$(request_status "$tester_jwt" GET "profiles?select=id&limit=0" accept '')"
 expect_status 200 "$status" "PostgREST exposes rebuild_v2"
@@ -202,4 +247,4 @@ if [[ "$private_status" != "406" ]]; then
 fi
 echo "PASS: rebuild_v2_private remains unexposed to PostgREST"
 
-echo "PASS: frontend RPC signature, grants, and representative role-boundary checks completed."
+echo "PASS: all 47 frontend RPC names accounted for (45 V2 + 2 legacy public); 2 V2 route gaps are explicitly documented."

@@ -138,11 +138,17 @@ BEGIN
     v_checked := v_checked + 1;
   END LOOP;
 
-  IF has_schema_privilege('anon', 'rebuild_v2_private', 'USAGE') THEN
-    RAISE EXCEPTION 'Anonymous role must not have USAGE on rebuild_v2_private';
+  IF has_schema_privilege('anon', 'rebuild_v2', 'USAGE')
+     OR has_schema_privilege('anon', 'rebuild_v2_private', 'USAGE') THEN
+    RAISE EXCEPTION 'Anonymous role must not have USAGE on rebuild_v2 or rebuild_v2_private';
   END IF;
 
-  RAISE NOTICE 'PASS: % private identity implementations have authenticated-only EXECUTE; private schema is not usable by anon.', v_checked;
+  IF NOT has_schema_privilege('authenticated', 'rebuild_v2', 'USAGE')
+     OR NOT has_schema_privilege('authenticated', 'rebuild_v2_private', 'USAGE') THEN
+    RAISE EXCEPTION 'Authenticated role must have USAGE on rebuild_v2 and rebuild_v2_private';
+  END IF;
+
+  RAISE NOTICE 'PASS: % private identity implementations have authenticated-only EXECUTE; schema USAGE is denied to anon and granted to authenticated.', v_checked;
 END;
 $identity_impl_contract$;
 

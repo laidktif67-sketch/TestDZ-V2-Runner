@@ -31,11 +31,11 @@ After the secret is saved:
 
 1. Open **Actions**.
 2. Select **TestDZ V2 isolated verification**.
-3. Press **Run workflow**, choose `main`, and confirm.
+3. Press **Run workflow**, choose `fix/identity-rpc-v2-contract`, and confirm.
 
 The workflow has two jobs:
 
-- **Database and integration contracts:** apply all 34 V2 SQL files to a fresh local Supabase database; run 31 post-migration SQL contracts plus the phase-one security contract; include the PR #117 cohort-transition test from its exact reviewed SHA; verify all 47 unique frontend RPC names across 51 call sites: 45 functions in `rebuild_v2` plus two legacy-only identity functions in `public`; check exact named arguments and authenticated-versus-anonymous grants; exercise representative PostgREST calls and role boundaries for Tester, Developer, Admin, Financial, and Support; and verify cleanup of synthetic identities, profiles, roles, and wallets in both `public` and `rebuild_v2`. The PostgREST smoke checks also confirm that `rebuild_v2` is exposed and `rebuild_v2_private` is not. The two legacy-only identity functions (`get_my_active_sessions`, `get_my_security_activity`) are explicitly tested in `public` and recorded as a V2 cutover blocker: the frontend currently calls them through `getAppDataClient`, which routes to `rebuild_v2` when the V2 flag is enabled.
+- **Database and integration contracts:** apply all 34 V2 SQL files to a fresh local Supabase database; run 31 post-migration SQL contracts plus the phase-one security contract; include the PR #117 cohort-transition test from its exact reviewed SHA; verify all 47 unique frontend RPC names across 51 call sites in `rebuild_v2`, including the two identity-security RPCs; check exact named arguments and authenticated-versus-anonymous grants; exercise representative PostgREST calls and role boundaries for Tester, Developer, Admin, Financial, and Support; seed distinct session and audit-event records for two authenticated users and verify each identity RPC returns only the caller's records; verify anonymous execution is denied; and verify cleanup of synthetic identities, sessions, audit events, profiles, roles, and wallets in both `public` and `rebuild_v2`. The PostgREST smoke checks also confirm that `rebuild_v2` is exposed and `rebuild_v2_private` is not.
 - **Edge Function type-check:** type-check the notification and developer-invitation functions with the pinned Deno version.
 
 A green run is evidence only for the pinned candidate and the listed checks. It is not a complete end-to-end test of every frontend page or every RPC with realistic records, does not compare candidate data with production, and does not approve a production cutover or deployment.

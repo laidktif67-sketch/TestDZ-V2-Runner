@@ -47,6 +47,19 @@ jobs:
           test "$actual" = "$expected"
           echo "Verified candidate commit: $actual"
 
+      - name: Checkout PR #117 cohort contract at exact reviewed head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: laidktif67-sketch/TestDZ
+          ref: b99d846a455549b468a8a1624fe3dbd1f7db1ee2
+          token: ${{ secrets.TESTDZ_READ_TOKEN }}
+          path: TestDZ-PR117
+          sparse-checkout: |
+            supabase/rebuild-v2/tests/030_developer_cohort_transition_contract.sql
+          sparse-checkout-cone-mode: false
+          fetch-depth: 1
+          persist-credentials: false
+
       - name: Set up Supabase CLI
         uses: supabase/setup-cli@v3
         with:
@@ -121,6 +134,7 @@ jobs:
             supabase/rebuild-v2/tests/027_role_explicit_support_ticket_creation_contract.sql
             supabase/rebuild-v2/tests/028_developer_test_invitations_contract.sql
             supabase/rebuild-v2/tests/029_developer_test_edit_contract.sql
+            ../TestDZ-PR117/supabase/rebuild-v2/tests/030_developer_cohort_transition_contract.sql
           )
 
           for contract in "${contracts[@]}"; do
@@ -130,7 +144,7 @@ jobs:
             echo "::endgroup::"
           done
 
-          echo "PASS: all 34 SQL files applied and all 30 post-migration contract scripts completed."
+          echo "PASS: all 34 SQL files applied and all 31 post-migration contract scripts completed, including PR #117 cohort transitions."
           echo "Note: security_contract.sql was also run immediately after migration 006."
 
       - name: Stop disposable local Supabase stack

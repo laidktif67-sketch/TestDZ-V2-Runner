@@ -199,8 +199,8 @@ VALUES
 
 INSERT INTO auth.audit_log_entries(id,payload,created_at,ip_address)
 VALUES
-  ('63000000-0000-4000-8000-000000000001',jsonb_build_object('actor_id','61000000-0000-4000-8000-000000000001','action','runner_identity_activity_user_one'),now(),'192.0.2.11'),
-  ('63000000-0000-4000-8000-000000000002',jsonb_build_object('actor_id','61000000-0000-4000-8000-000000000002','action','runner_identity_activity_user_two'),now(),'192.0.2.12');
+  ('63000000-0000-4000-8000-000000000001',jsonb_build_object('actor_id','61000000-0000-4000-8000-000000000001','action','runner_identity_activity_user_one')::json,now(),'192.0.2.11'),
+  ('63000000-0000-4000-8000-000000000002',jsonb_build_object('actor_id','61000000-0000-4000-8000-000000000002','action','runner_identity_activity_user_two')::json,now(),'192.0.2.12');
 SQL
 
 jwt_for() {

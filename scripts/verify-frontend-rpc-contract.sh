@@ -18,6 +18,8 @@ ids=(
 
 cleanup() {
   psql "$DB_URL" -X -v ON_ERROR_STOP=1 <<'SQL'
+BEGIN;
+
 -- The legacy Auth bootstrap still creates public.wallets as well as V2 wallets.
 -- Delete both explicitly; public.wallets also RESTRICTs deletion of public.profiles.
 DELETE FROM public.wallets
@@ -77,6 +79,24 @@ BEGIN
       '61000000-0000-4000-8000-000000000005'
     )
   ) OR EXISTS (
+    SELECT 1 FROM public.user_roles
+    WHERE user_id IN (
+      '61000000-0000-4000-8000-000000000001',
+      '61000000-0000-4000-8000-000000000002',
+      '61000000-0000-4000-8000-000000000003',
+      '61000000-0000-4000-8000-000000000004',
+      '61000000-0000-4000-8000-000000000005'
+    )
+  ) OR EXISTS (
+    SELECT 1 FROM rebuild_v2.user_roles
+    WHERE user_id IN (
+      '61000000-0000-4000-8000-000000000001',
+      '61000000-0000-4000-8000-000000000002',
+      '61000000-0000-4000-8000-000000000003',
+      '61000000-0000-4000-8000-000000000004',
+      '61000000-0000-4000-8000-000000000005'
+    )
+  ) OR EXISTS (
     SELECT 1 FROM public.wallets
     WHERE user_id IN (
       '61000000-0000-4000-8000-000000000001',
@@ -99,6 +119,8 @@ BEGIN
   END IF;
 END;
 $cleanup$;
+
+COMMIT;
 SQL
 }
 trap cleanup EXIT

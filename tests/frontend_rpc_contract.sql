@@ -102,6 +102,50 @@ BEGIN
 END;
 $contract$;
 
+-- Verify the private implementations independently from their public wrappers.
+DO $identity_impl_contract$
+DECLARE
+  v_expected record;
+  v_oid oid;
+  v_checked integer := 0;
+BEGIN
+  FOR v_expected IN
+    SELECT * FROM (VALUES
+      ('get_my_active_sessions_impl'::text, 0),
+      ('get_my_security_activity_impl'::text, 1)
+    ) AS impl(function_name, argument_count)
+  LOOP
+    SELECT p.oid INTO v_oid
+    FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'rebuild_v2_private'
+      AND p.proname = v_expected.function_name
+      AND p.prokind = 'f'
+      AND p.pronargs = v_expected.argument_count;
+
+    IF NOT FOUND THEN
+      RAISE EXCEPTION 'Identity implementation missing or has wrong signature: rebuild_v2_private.%', v_expected.function_name;
+    END IF;
+
+    IF has_function_privilege('anon', v_oid, 'EXECUTE') THEN
+      RAISE EXCEPTION 'Anonymous role must not execute rebuild_v2_private.%', v_expected.function_name;
+    END IF;
+
+    IF NOT has_function_privilege('authenticated', v_oid, 'EXECUTE') THEN
+      RAISE EXCEPTION 'Authenticated role lacks EXECUTE on rebuild_v2_private.%', v_expected.function_name;
+    END IF;
+
+    v_checked := v_checked + 1;
+  END LOOP;
+
+  IF has_schema_privilege('anon', 'rebuild_v2_private', 'USAGE') THEN
+    RAISE EXCEPTION 'Anonymous role must not have USAGE on rebuild_v2_private';
+  END IF;
+
+  RAISE NOTICE 'PASS: % private identity implementations have authenticated-only EXECUTE; private schema is not usable by anon.', v_checked;
+END;
+$identity_impl_contract$;
+
 -- Both identity security RPCs are part of the V2 frontend contract.
 -- Runtime isolation is exercised through PostgREST in the companion shell test.
 

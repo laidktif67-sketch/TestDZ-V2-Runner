@@ -12,6 +12,8 @@ INSERT INTO expected_frontend_rpc(function_name, argument_names) VALUES
 ('admin_review_role_request', ARRAY['p_request_id','p_decision','p_review_note']),
 ('admin_grant_role', ARRAY['p_user_id','p_role','p_reason']),
 ('get_app_limit', ARRAY[]::text[]),
+('get_my_active_sessions', ARRAY[]::text[]),
+('get_my_security_activity', ARRAY['p_limit']),
 ('create_app', ARRAY['p_name','p_package_name','p_description','p_category']),
 ('update_app', ARRAY['p_app_id','p_name','p_description','p_category','p_icon_url']),
 ('archive_app', ARRAY['p_app_id']),
@@ -61,8 +63,8 @@ DECLARE
   v_actual_names text[];
   v_checked integer := 0;
 BEGIN
-  IF (SELECT count(*) FROM expected_frontend_rpc) <> 45 THEN
-    RAISE EXCEPTION 'Expected 45 unique frontend RPC functions; fixture contains %',
+  IF (SELECT count(*) FROM expected_frontend_rpc) <> 47 THEN
+    RAISE EXCEPTION 'Expected 47 unique frontend RPC functions; fixture contains %',
       (SELECT count(*) FROM expected_frontend_rpc);
   END IF;
 
@@ -100,72 +102,7 @@ BEGIN
 END;
 $contract$;
 
--- The frontend contains 47 unique RPC names across 51 call sites. Two identity
--- security RPCs are still defined only in public by legacy migrations.
-DO $legacy_contract$
-DECLARE
-  v_expected record;
-  v_name text;
-  v_args text[];
-  v_oid oid;
-  v_actual_names text[];
-  v_checked integer := 0;
-BEGIN
-  FOR v_expected IN
-    SELECT * FROM (VALUES
-      ('get_my_active_sessions'::text, ARRAY[]::text[]),
-      ('get_my_security_activity'::text, ARRAY['p_limit']::text[])
-    ) AS legacy(function_name, argument_names)
-  LOOP
-    v_name := v_expected.function_name;
-    v_args := v_expected.argument_names;
-
-    SELECT p.oid, COALESCE(p.proargnames[1:p.pronargs], ARRAY[]::text[])
-      INTO v_oid, v_actual_names
-    FROM pg_proc p
-    JOIN pg_namespace n ON n.oid = p.pronamespace
-    WHERE n.nspname = 'public'
-      AND p.proname = v_name
-      AND p.prokind = 'f'
-      AND p.pronargs = cardinality(v_args);
-
-    IF NOT FOUND THEN
-      RAISE EXCEPTION 'Legacy frontend RPC missing or wrong argument count: public.%', v_name;
-    END IF;
-
-    IF v_actual_names IS DISTINCT FROM v_args THEN
-      RAISE EXCEPTION 'Legacy RPC argument-name mismatch for public.%: expected %, actual %',
-        v_name, v_args, v_actual_names;
-    END IF;
-
-    IF has_function_privilege('anon', v_oid, 'EXECUTE') THEN
-      RAISE EXCEPTION 'Anonymous role must not execute public.%', v_name;
-    END IF;
-
-    IF NOT has_function_privilege('authenticated', v_oid, 'EXECUTE') THEN
-      RAISE EXCEPTION 'Authenticated role lacks EXECUTE on public.%', v_name;
-    END IF;
-
-    IF EXISTS (
-      SELECT 1 FROM pg_proc p
-      JOIN pg_namespace n ON n.oid = p.pronamespace
-      WHERE n.nspname = 'rebuild_v2'
-        AND p.proname = v_name
-        AND p.pronargs = cardinality(v_args)
-    ) THEN
-      RAISE EXCEPTION 'Expected known legacy-only RPC public.% to remain absent from rebuild_v2 until explicitly migrated', v_name;
-    END IF;
-
-    v_checked := v_checked + 1;
-  END LOOP;
-
-  IF v_checked <> 2 THEN
-    RAISE EXCEPTION 'Expected 2 legacy-only frontend RPCs; checked %', v_checked;
-  END IF;
-
-  RAISE NOTICE 'PASS: 2 legacy-only identity RPCs exist in public with exact named arguments and authenticated-only EXECUTE grants.';
-  RAISE WARNING 'V2 CUTOVER BLOCKER: get_my_active_sessions and get_my_security_activity are called through getAppDataClient, so they will fail while V2 is enabled until migrated into rebuild_v2 or explicitly routed to the public client.';
-END;
-$legacy_contract$;
+-- Both identity security RPCs are part of the V2 frontend contract.
+-- Runtime isolation is exercised through PostgREST in the companion shell test.
 
 ROLLBACK;

@@ -104,18 +104,22 @@ $contract$;
 -- security RPCs are still defined only in public by legacy migrations.
 DO $legacy_contract$
 DECLARE
+  v_expected record;
   v_name text;
   v_args text[];
   v_oid oid;
   v_actual_names text[];
   v_checked integer := 0;
 BEGIN
-  FOR v_name, v_args IN
+  FOR v_expected IN
     SELECT * FROM (VALUES
       ('get_my_active_sessions'::text, ARRAY[]::text[]),
       ('get_my_security_activity'::text, ARRAY['p_limit']::text[])
     ) AS legacy(function_name, argument_names)
   LOOP
+    v_name := v_expected.function_name;
+    v_args := v_expected.argument_names;
+
     SELECT p.oid, COALESCE(p.proargnames[1:p.pronargs], ARRAY[]::text[])
       INTO v_oid, v_actual_names
     FROM pg_proc p

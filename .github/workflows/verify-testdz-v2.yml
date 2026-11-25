@@ -147,6 +147,17 @@ jobs:
           echo "PASS: all 34 SQL files applied and all 31 post-migration contract scripts completed, including PR #117 cohort transitions."
           echo "Note: security_contract.sql was also run immediately after migration 006."
 
+      - name: Verify frontend RPC signatures and PostgREST role boundaries
+        shell: bash
+        working-directory: TestDZ
+        run: |
+          set -euo pipefail
+          supabase status --output env > "$RUNNER_TEMP/supabase.env"
+          set -a
+          source "$RUNNER_TEMP/supabase.env"
+          set +a
+          bash "$GITHUB_WORKSPACE/scripts/verify-frontend-rpc-contract.sh"
+
       - name: Stop disposable local Supabase stack
         if: always()
         working-directory: TestDZ

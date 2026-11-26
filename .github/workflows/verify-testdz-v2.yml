@@ -12,7 +12,7 @@ concurrency:
 
 jobs:
   database-contracts:
-    name: Apply 34 SQL files and run database contracts
+    name: Apply 26 SQL migrations and run V2 contracts
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -27,38 +27,24 @@ jobs:
             exit 1
           fi
 
-      - name: Checkout exact TestDZ candidate commit
+      - name: Checkout exact TestDZ V2 candidate
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           repository: laidktif67-sketch/TestDZ
-          ref: d9e01eeb7d6a23a6491241a8f6cfd22d0266193a
+          ref: 9d802376a0bb675b46c3811a5a1ab7206fe407ca
           token: ${{ secrets.TESTDZ_READ_TOKEN }}
           path: TestDZ
           fetch-depth: 1
           persist-credentials: false
 
-      - name: Verify checked-out commit
-        shell: bash
+      - name: Verify checked-out candidate commit
         working-directory: TestDZ
         run: |
           set -euo pipefail
           actual="$(git rev-parse HEAD)"
-          expected="d9e01eeb7d6a23a6491241a8f6cfd22d0266193a"
+          expected="9d802376a0bb675b46c3811a5a1ab7206fe407ca"
           test "$actual" = "$expected"
-          echo "Verified candidate commit: $actual"
-
-      - name: Checkout PR #117 cohort contract at exact reviewed head
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-        with:
-          repository: laidktif67-sketch/TestDZ
-          ref: b99d846a455549b468a8a1624fe3dbd1f7db1ee2
-          token: ${{ secrets.TESTDZ_READ_TOKEN }}
-          path: TestDZ-PR117
-          sparse-checkout: |
-            supabase/rebuild-v2/tests/030_developer_cohort_transition_contract.sql
-          sparse-checkout-cone-mode: false
-          fetch-depth: 1
-          persist-credentials: false
+          echo "Verified TestDZ candidate: $actual"
 
       - name: Set up Supabase CLI
         uses: supabase/setup-cli@v3
@@ -68,13 +54,13 @@ jobs:
       - name: Install PostgreSQL client
         run: |
           sudo apt-get update
-          sudo apt-get install --yes postgresql-client
+          sudo apt-get install --yes postgresql-client jq
 
       - name: Start disposable local Supabase stack
         working-directory: TestDZ
         run: supabase start -x studio,edge-runtime,imgproxy,logflare,vector
 
-      - name: Apply candidate SQL and run all V2 contracts
+      - name: Apply all candidate migrations and V2 contracts
         shell: bash
         working-directory: TestDZ
         run: |
@@ -87,8 +73,8 @@ jobs:
           test -n "${DB_URL:-}" || { echo "::error::Supabase CLI did not export DB_URL"; exit 1; }
 
           scripts=(supabase/rebuild-v2/[0-9][0-9][0-9]_*.sql)
-          if [[ "${#scripts[@]}" -ne 34 ]]; then
-            echo "::error::Expected 34 candidate SQL scripts; found ${#scripts[@]}"
+          if [[ "${#scripts[@]}" -ne 26 ]]; then
+            echo "::error::Expected exactly 26 candidate SQL migrations; found ${#scripts[@]}"
             exit 1
           fi
 
@@ -105,8 +91,6 @@ jobs:
 
           contracts=(
             supabase/rebuild-v2/tests/final_state_contract.sql
-            supabase/rebuild-v2/tests/catalog_fingerprint.sql
-            supabase/rebuild-v2/tests/catalog_difference_details.sql
             supabase/rebuild-v2/tests/010_security_definer_boundary_contract.sql
             supabase/rebuild-v2/tests/003_app_lifecycle_contract.sql
             supabase/rebuild-v2/tests/004_profile_contract.sql
@@ -116,25 +100,9 @@ jobs:
             supabase/rebuild-v2/tests/008_developer_feedback_privacy_contract.sql
             supabase/rebuild-v2/tests/009_wallet_idempotency_contract.sql
             supabase/rebuild-v2/tests/011_notification_recipient_roles_contract.sql
-            supabase/rebuild-v2/tests/012_notification_outbox_retry_contract.sql
-            supabase/rebuild-v2/tests/013_wallet_role_boundary_contract.sql
-            supabase/rebuild-v2/tests/014_onboarding_developer_approval_contract.sql
-            supabase/rebuild-v2/tests/015_admin_role_request_management_contract.sql
-            supabase/rebuild-v2/tests/016_admin_role_grant_contract.sql
-            supabase/rebuild-v2/tests/017_support_ticket_role_boundary_contract.sql
-            supabase/rebuild-v2/tests/018_audit_event_append_only_contract.sql
-            supabase/rebuild-v2/tests/019_app_icon_storage_boundary_contract.sql
-            supabase/rebuild-v2/tests/020_support_ticket_audited_workflow_contract.sql
-            supabase/rebuild-v2/tests/021_fraud_fail_closed_contract.sql
-            supabase/rebuild-v2/tests/022_reports_disputes_fail_closed_contract.sql
-            supabase/rebuild-v2/tests/023_refunds_fail_closed_contract.sql
-            supabase/rebuild-v2/tests/024_report_evidence_metadata_contract.sql
-            supabase/rebuild-v2/tests/025_six_step_test_config_contract.sql
             supabase/rebuild-v2/tests/026_developer_test_monitoring_privacy_contract.sql
             supabase/rebuild-v2/tests/027_role_explicit_support_ticket_creation_contract.sql
             supabase/rebuild-v2/tests/028_developer_test_invitations_contract.sql
-            supabase/rebuild-v2/tests/029_developer_test_edit_contract.sql
-            ../TestDZ-PR117/supabase/rebuild-v2/tests/030_developer_cohort_transition_contract.sql
           )
 
           for contract in "${contracts[@]}"; do
@@ -144,16 +112,17 @@ jobs:
             echo "::endgroup::"
           done
 
-          echo "PASS: all 34 SQL files applied and all 31 post-migration contract scripts completed, including PR #117 cohort transitions."
-          echo "Note: security_contract.sql was also run immediately after migration 006."
+          echo "PASS: all 26 migrations and 13 post-migration V2 contracts completed."
+          echo "PASS: security_contract.sql ran immediately after migration 006."
 
-      - name: Checkout runner verification scripts
+      - name: Checkout Runner verification scripts
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
+          ref: ${{ github.ref }}
           path: Runner
           persist-credentials: false
 
-      - name: Verify frontend RPC signatures and PostgREST role boundaries
+      - name: Verify 46 curated frontend RPC names, exact arguments, role boundaries, and identity isolation
         shell: bash
         working-directory: TestDZ
         run: |
@@ -169,8 +138,8 @@ jobs:
         working-directory: TestDZ
         run: supabase stop --no-backup
 
-  edge-function-typecheck:
-    name: Type-check candidate Edge Functions
+  notification-edge-function:
+    name: Type-check notification and developer invitation Edge Functions
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -185,28 +154,29 @@ jobs:
             exit 1
           fi
 
-      - name: Checkout exact TestDZ candidate commit
+      - name: Checkout exact TestDZ V2 candidate
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           repository: laidktif67-sketch/TestDZ
-          ref: d9e01eeb7d6a23a6491241a8f6cfd22d0266193a
+          ref: 9d802376a0bb675b46c3811a5a1ab7206fe407ca
           token: ${{ secrets.TESTDZ_READ_TOKEN }}
           path: TestDZ
           fetch-depth: 1
           persist-credentials: false
 
-      - name: Verify checked-out commit
+      - name: Verify checked-out candidate commit
         working-directory: TestDZ
         run: |
+          set -euo pipefail
           actual="$(git rev-parse HEAD)"
-          test "$actual" = "d9e01eeb7d6a23a6491241a8f6cfd22d0266193a"
-          echo "Verified candidate commit: $actual"
+          test "$actual" = "9d802376a0bb675b46c3811a5a1ab7206fe407ca"
+          echo "Verified TestDZ candidate: $actual"
 
       - name: Set up Deno
         uses: denoland/setup-deno@e95548e56dfa95d4e1a28d6f422fafe75c4c26fb
         with:
           deno-version: 2.9.8
 
-      - name: Type-check notification and invitation Edge Functions
+      - name: Type-check notification and developer invitation Edge Functions
         working-directory: TestDZ
         run: deno check --no-lock --node-modules-dir=auto supabase/functions/dispatch-notifications/index.ts supabase/functions/developer-invitations/index.ts

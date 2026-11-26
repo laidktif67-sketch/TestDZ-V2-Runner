@@ -5,7 +5,7 @@ A separate, disposable GitHub Actions runner for verifying one immutable, curate
 ## Current candidate
 
 - TestDZ repository: `laidktif67-sketch/TestDZ`
-- Pinned candidate commit: `b82c4c6d0ef9bfe42e1ab4502122b6e73859d43c`
+- Pinned candidate commit: `80dc35a7e2b9536f41b17ae5d8c01d3539437a12`
 - Candidate integration series: PR #150 (Algerian day boundary), PR #151 (notification lifecycle), PR #152 (Support privacy and developer feedback replies), and PR #153 (developer monitoring, role-explicit Support, and invitations).
 - Expected SQL migrations: 26 (001–021, then 030–034). Migrations 022–029 remain intentionally excluded pending separate dependency/security review.
 - Post-migration V2 contracts: 13 explicitly listed scripts, including aggregate-monitoring privacy, role-explicit Support ticket creation, and invitation lifecycle. The phase-one `security_contract.sql` is run immediately after migration 006.

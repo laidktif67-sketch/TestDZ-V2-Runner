@@ -5,11 +5,11 @@ A separate, disposable GitHub Actions runner for verifying one immutable, curate
 ## Current candidate
 
 - TestDZ repository: `laidktif67-sketch/TestDZ`
-- Pinned candidate commit: `9d802376a0bb675b46c3811a5a1ab7206fe407ca`
-- Candidate integration series: PR #150 (Algerian day boundary), PR #151 (notification lifecycle), PR #152 (Support privacy and developer feedback replies), and PR #153 (developer monitoring, role-explicit Support, and invitations).
-- Expected SQL migrations: 26 (001–021, then 030–034). Migrations 022–029 remain intentionally excluded pending separate dependency/security review.
-- Post-migration V2 contracts: 13 explicitly listed scripts, including aggregate-monitoring privacy, role-explicit Support ticket creation, and invitation lifecycle. The phase-one `security_contract.sql` is run immediately after migration 006.
-- Frontend RPC verification: retains the 46-function curated V2 frontend RPC contract, exact named-argument checks, role-boundary checks, PostgREST exposure checks, and per-user isolation checks for session/security activity.
+- Pinned candidate commit: `a1caace916e4233356a00ca7006cfafc9eabd3ee`
+- Candidate integration series: PR #150 (Algerian day boundary), PR #151 (notification lifecycle), PR #152 (Support privacy and developer feedback replies), and PR #153 (developer monitoring, role-explicit Support, and invitations), plus PR #155 (Admin role management, audited Support workflow, report evidence privacy, and six-step test configuration).
+- Expected SQL migrations: 34 (001–034). PR #155 adds the curated 022–029 migrations after dependency/security review.
+- Post-migration V2 contracts: 19 explicitly listed scripts, including aggregate-monitoring privacy, role-explicit Support ticket creation, and invitation lifecycle. The phase-one `security_contract.sql` is run immediately after migration 006.
+- Frontend RPC verification: retains the 51-function curated V2 frontend RPC contract, exact named-argument checks, role-boundary checks, PostgREST exposure checks, and per-user isolation checks for session/security activity.
 - Privacy guard: aggregate monitoring metrics and daily activity are both suppressed below three distinct testers.
 - Edge Function checks: notification dispatcher and developer invitations.
 
@@ -47,7 +47,7 @@ After the secret is saved:
 
 The workflow has two jobs:
 
-- **Database contracts:** apply all 26 pinned V2 SQL migrations to a fresh local Supabase database; run the phase-one security contract and the 13 explicitly listed post-migration contracts; then run the Runner's frontend RPC contract and representative PostgREST role/identity-isolation checks.
+- **Database contracts:** apply all 34 pinned V2 SQL migrations to a fresh local Supabase database; run the phase-one security contract and the 19 explicitly listed post-migration contracts; then run the Runner's frontend RPC contract and representative PostgREST role/identity-isolation checks.
 - **Notification Edge Function:** type-check `supabase/functions/dispatch-notifications/index.ts` and `supabase/functions/developer-invitations/index.ts` with the pinned Deno version.
 
 ## If the workflow fails
@@ -56,4 +56,4 @@ Open the failed job and share the run URL and failing step name. Do not share se
 
 ## Scope discipline
 
-Do not add migrations 022–032, legacy PR contracts, PR #117 cohort-transition tests, catalog fingerprint probes, or other old branch artifacts to this runner without a separate dependency review and an explicit decision to include them. Do not change the pinned candidate merely because another branch exists; update the pin only after its exact commit and CI evidence are verified.
+Do not add uncurated migrations beyond 034, legacy PR contracts, PR #117 cohort-transition tests, catalog fingerprint probes, or other old branch artifacts without a separate dependency review and an explicit decision to include them. Do not change the pinned candidate merely because another branch exists; update the pin only after its exact commit and CI evidence are verified.

@@ -271,7 +271,11 @@ expect_status 200 "$status" "Developer can call get_developer_feedback"
 # domain-level 404, while every non-Admin role must be rejected with 403.
 review_probe='{"p_app_id":"64000000-0000-4000-8000-000000000001","p_decision":"approved","p_reason":"runner authorization probe"}'
 status="$(request_status "$admin_jwt" POST "rpc/review_app" content "$review_probe")"
-expect_status 404 "$status" "Admin reaches the review_app domain check"
+# PostgREST surfaces the implementation's P0002 APP_NOT_PENDING_REVIEW exception as HTTP 500.
+# Assert the exact SQLSTATE/message so this authorization probe cannot pass on an unrelated server error.
+expect_status 500 "$status" "Admin reaches the review_app domain guard"
+jq -e '.code == "P0002" and .message == "APP_NOT_PENDING_REVIEW"' "$RUNNER_TEMP/rpc-role-response.json" >/dev/null
+echo "PASS: Admin reached review_app and received the expected APP_NOT_PENDING_REVIEW domain guard"
 
 status="$(request_status "$financial_jwt" GET "payments?select=id&limit=0" accept '')"
 expect_status 200 "$status" "Financial role can read the payments surface"

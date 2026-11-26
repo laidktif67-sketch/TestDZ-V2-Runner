@@ -5,11 +5,12 @@ A separate, disposable GitHub Actions runner for verifying one immutable, curate
 ## Current candidate
 
 - TestDZ repository: `laidktif67-sketch/TestDZ`
-- Pinned candidate commit: `80dc35a7e2b9536f41b17ae5d8c01d3539437a12`
+- Pinned candidate commit: `9d802376a0bb675b46c3811a5a1ab7206fe407ca`
 - Candidate integration series: PR #150 (Algerian day boundary), PR #151 (notification lifecycle), PR #152 (Support privacy and developer feedback replies), and PR #153 (developer monitoring, role-explicit Support, and invitations).
 - Expected SQL migrations: 26 (001–021, then 030–034). Migrations 022–029 remain intentionally excluded pending separate dependency/security review.
 - Post-migration V2 contracts: 13 explicitly listed scripts, including aggregate-monitoring privacy, role-explicit Support ticket creation, and invitation lifecycle. The phase-one `security_contract.sql` is run immediately after migration 006.
 - Frontend RPC verification: retains the 46-function curated V2 frontend RPC contract, exact named-argument checks, role-boundary checks, PostgREST exposure checks, and per-user isolation checks for session/security activity.
+- Privacy guard: aggregate monitoring metrics and daily activity are both suppressed below three distinct testers.
 - Edge Function checks: notification dispatcher and developer invitations.
 
 ## Safety model

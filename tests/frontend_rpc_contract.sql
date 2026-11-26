@@ -1,6 +1,6 @@
 -- Frontend RPC surface contract for the curated TestDZ V2 candidate.
 -- Run only against the disposable local Supabase database created by the Runner workflow.
--- Migrations 022-032 are intentionally excluded; their RPCs are not part of this candidate.
+-- Migrations 022-029 are intentionally excluded; selected migrations 030-032 add six curated RPCs.
 BEGIN;
 
 CREATE TEMP TABLE expected_frontend_rpc (
@@ -15,7 +15,9 @@ INSERT INTO expected_frontend_rpc(function_name, argument_names) VALUES
 ('create_app', ARRAY['p_name','p_package_name','p_description','p_category']),
 ('create_assignment_submission', ARRAY['p_assignment_id','p_summary','p_comments']),
 ('create_support_ticket', ARRAY['p_subject','p_category','p_priority','p_description']),
+('create_support_ticket_for_role', ARRAY['p_requester_role','p_subject','p_category','p_priority','p_description']),
 ('create_test', ARRAY['p_app_id','p_title','p_description','p_short_summary','p_test_type','p_min_testers','p_start_date','p_end_date','p_duration','p_instructions']),
+('create_test_invitation', ARRAY['p_test_id','p_recipient_email','p_token_hash','p_expires_at','p_idempotency_key']),
 ('create_test_cohort', ARRAY['p_test_id','p_name','p_capacity','p_starts_at','p_ends_at']),
 ('finalize_assignment_submission', ARRAY['p_submission_id']),
 ('finalize_test_asset', ARRAY['p_asset_id']),
@@ -23,18 +25,22 @@ INSERT INTO expected_frontend_rpc(function_name, argument_names) VALUES
 ('get_app_limit', ARRAY[]::text[]),
 ('get_developer_feedback', ARRAY[]::text[]),
 ('get_developer_feedback_messages', ARRAY['p_feedback_id']),
+('get_developer_test_monitoring', ARRAY['p_test_id']),
 ('get_discoverable_tests', ARRAY[]::text[]),
 ('get_my_active_sessions', ARRAY[]::text[]),
 ('get_my_security_activity', ARRAY['p_limit']),
 ('get_tester_feedback_messages', ARRAY[]::text[]),
 ('join_test', ARRAY['p_test_id']),
+('list_test_invitations', ARRAY['p_test_id']),
 ('mark_all_notifications_read', ARRAY['p_recipient_role']),
 ('mark_notification_read', ARRAY['p_notification_id','p_recipient_role']),
 ('register_assignment_submission_attachment', ARRAY['p_submission_id','p_file_id','p_extension','p_original_filename','p_mime_type','p_size_bytes']),
 ('register_test_asset', ARRAY['p_test_id','p_file_id','p_title','p_original_filename','p_mime_type','p_size_bytes']),
 ('register_test_build', ARRAY['p_test_id','p_file_id','p_version_label','p_original_filename','p_size_bytes','p_sha256']),
 ('restore_app', ARRAY['p_app_id']),
+('revoke_test_invitation', ARRAY['p_invitation_id','p_reason']),
 ('review_app', ARRAY['p_app_id','p_decision','p_reason']),
+('redeem_test_invitation', ARRAY['p_token_hash']),
 ('review_test', ARRAY['p_test_id','p_decision','p_reason']),
 ('save_test_content', ARRAY['p_test_id','p_steps','p_requirements']),
 ('send_developer_feedback_message', ARRAY['p_feedback_id','p_body']),
@@ -57,8 +63,8 @@ DECLARE
   v_actual_names text[];
   v_checked integer := 0;
 BEGIN
-  IF (SELECT count(*) FROM expected_frontend_rpc) <> 40 THEN
-    RAISE EXCEPTION 'Expected 40 unique frontend RPC functions; fixture contains %',
+  IF (SELECT count(*) FROM expected_frontend_rpc) <> 46 THEN
+    RAISE EXCEPTION 'Expected 46 unique frontend RPC functions; fixture contains %',
       (SELECT count(*) FROM expected_frontend_rpc);
   END IF;
 

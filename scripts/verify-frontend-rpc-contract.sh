@@ -346,4 +346,4 @@ if [[ "$private_status" != "406" ]]; then
 fi
 echo "PASS: rebuild_v2_private remains unexposed to PostgREST"
 
-echo "PASS: all 46 curated frontend RPC names are covered in rebuild_v2, including role boundaries and per-user identity isolation checks."
+echo "PASS: all 51 curated frontend RPC names are covered in rebuild_v2, including role boundaries and per-user identity isolation checks."

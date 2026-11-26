@@ -43,7 +43,7 @@ After the secret is saved:
 
 1. Open **Actions**.
 2. Select **TestDZ V2 isolated verification**.
-3. Press **Run workflow** and select branch `integration/runner-v2-candidate-9e28de2`.
+3. Press **Run workflow** and select branch `integration/runner-v2-candidate-pr155`.
 
 The workflow has two jobs:
 

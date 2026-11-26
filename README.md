@@ -9,7 +9,7 @@ A separate, disposable GitHub Actions runner for verifying one immutable, curate
 - Candidate integration series: PR #150 (Algerian day boundary), PR #151 (notification lifecycle), and PR #152 (Support privacy and developer feedback replies).
 - Expected SQL migrations: 23 (001–021, then 033–034). The missing migration numbers 022–032 are intentionally excluded from this curated candidate; they are not implicitly approved or part of this runner baseline.
 - Post-migration V2 contracts: 10 explicitly listed scripts. The phase-one `security_contract.sql` is run immediately after migration 006.
-- Frontend RPC verification: retains the 47-name V2 identity/RPC contract, exact named-argument checks, role-boundary checks, PostgREST exposure checks, and per-user isolation checks for session/security activity.
+- Frontend RPC verification: retains the 40-function curated V2 frontend RPC contract, exact named-argument checks, role-boundary checks, PostgREST exposure checks, and per-user isolation checks for session/security activity.
 - Edge Function check: notification dispatcher only.
 
 ## Safety model

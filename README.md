@@ -1,15 +1,26 @@
 # TestDZ-V2-Runner
 
-A separate, disposable GitHub Actions runner for verifying the TestDZ V2 database rebuild against one immutable candidate commit.
+A separate, disposable GitHub Actions runner for verifying one immutable, curated TestDZ V2 candidate. This repository is a test harness only; it is not the TestDZ application and does not replace the official TestDZ repository.
+
+## Current candidate
+
+- TestDZ repository: `laidktif67-sketch/TestDZ`
+- Pinned candidate commit: `9e28de22ca6511e8eb69252947d234d606e58a52`
+- Candidate integration series: PR #150 (Algerian day boundary), PR #151 (notification lifecycle), and PR #152 (Support privacy and developer feedback replies).
+- Expected SQL migrations: 23 (001–021, then 033–034). The missing migration numbers 022–032 are intentionally excluded from this curated candidate; they are not implicitly approved or part of this runner baseline.
+- Post-migration V2 contracts: 10 explicitly listed scripts. The phase-one `security_contract.sql` is run immediately after migration 006.
+- Frontend RPC verification: retains the 47-name V2 identity/RPC contract, exact named-argument checks, role-boundary checks, PostgREST exposure checks, and per-user isolation checks for session/security activity.
+- Edge Function check: notification dispatcher only.
 
 ## Safety model
 
 - This repository is public. Never commit credentials, access tokens, Supabase keys, database URLs, or production data here.
 - The workflow is manual-only (`workflow_dispatch`). It does not run for pushes or pull requests.
-- It checks out TestDZ candidate commit `d9e01eeb7d6a23a6491241a8f6cfd22d0266193a` and separately fetches only the PR #117 cohort contract from exact commit `b99d846a455549b468a8a1624fe3dbd1f7db1ee2`.
+- The workflow checks out the exact TestDZ commit above and verifies the checked-out SHA before running tests.
 - It starts a disposable local Supabase stack on a GitHub-hosted Ubuntu runner. It does not connect to the user's Supabase project.
 - The workflow requests read-only repository contents access. It does not write to TestDZ, run production migrations, or deploy the app.
 - The database job stops the local Supabase stack even when a test fails.
+- A green run is evidence only for this pinned candidate and the checks listed here. It is not a full end-to-end test of every page or every RPC with realistic records, and it does not approve production cutover or deployment.
 
 ## One-time setup: private TestDZ read access
 
@@ -31,15 +42,17 @@ After the secret is saved:
 
 1. Open **Actions**.
 2. Select **TestDZ V2 isolated verification**.
-3. Press **Run workflow**, choose `fix/identity-rpc-v2-contract`, and confirm.
+3. Press **Run workflow** and select branch `integration/runner-v2-candidate-9e28de2`.
 
 The workflow has two jobs:
 
-- **Database and integration contracts:** apply all 34 V2 SQL files to a fresh local Supabase database; run 31 post-migration SQL contracts plus the phase-one security contract; include the PR #117 cohort-transition test from its exact reviewed SHA; verify all 47 unique frontend RPC names across 51 call sites in `rebuild_v2`, including the two identity-security RPCs; check exact named arguments and authenticated-versus-anonymous grants; exercise representative PostgREST calls and role boundaries for Tester, Developer, Admin, Financial, and Support; seed distinct session and audit-event records for two authenticated users and verify each identity RPC returns only the caller's records; verify anonymous execution is denied; and verify cleanup of synthetic identities and their related Auth sessions, audit events, profiles, roles, and wallets across the `auth`, `public`, and `rebuild_v2` schemas. The PostgREST smoke checks also confirm that `rebuild_v2` is exposed and `rebuild_v2_private` is not.
-- **Edge Function type-check:** type-check the notification and developer-invitation functions with the pinned Deno version.
-
-A green run is evidence only for the pinned candidate and the listed checks. It is not a complete end-to-end test of every frontend page or every RPC with realistic records, does not compare candidate data with production, and does not approve a production cutover or deployment.
+- **Database contracts:** apply all 23 pinned V2 SQL migrations to a fresh local Supabase database; run the phase-one security contract and the 10 explicitly listed post-migration contracts; then run the Runner's frontend RPC contract and representative PostgREST role/identity-isolation checks.
+- **Notification Edge Function:** type-check `supabase/functions/dispatch-notifications/index.ts` with the pinned Deno version.
 
 ## If the workflow fails
 
 Open the failed job and share the run URL and failing step name. Do not share secret values, generated keys, database URLs, or token-bearing logs.
+
+## Scope discipline
+
+Do not add migrations 022–032, legacy PR contracts, PR #117 cohort-transition tests, catalog fingerprint probes, or other old branch artifacts to this runner without a separate dependency review and an explicit decision to include them. Do not change the pinned candidate merely because another branch exists; update the pin only after its exact commit and CI evidence are verified.

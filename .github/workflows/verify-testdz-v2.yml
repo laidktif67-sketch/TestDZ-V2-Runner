@@ -118,7 +118,7 @@ jobs:
             echo "::endgroup::"
           done
 
-          echo "PASS: all 26 migrations and 13 post-migration V2 contracts completed."
+          echo "PASS: all 34 migrations and 19 post-migration V2 contracts completed."
           echo "PASS: security_contract.sql ran immediately after migration 006."
 
       - name: Checkout Runner verification scripts
@@ -128,7 +128,7 @@ jobs:
           path: Runner
           persist-credentials: false
 
-      - name: Verify 46 curated frontend RPC names, exact arguments, role boundaries, and identity isolation
+      - name: Verify 51 curated frontend RPC names, exact arguments, role boundaries, and identity isolation
         shell: bash
         working-directory: TestDZ
         run: |

@@ -1,6 +1,6 @@
 -- Frontend RPC surface contract for the curated TestDZ V2 candidate through PR #155.
 -- Run only against the disposable local Supabase database created by the Runner workflow.
--- Migrations 022-029 are intentionally excluded; selected migrations 030-032 add six curated RPCs.
+-- RPC inventory covers the complete curated 001-034 candidate, including the five RPCs introduced with PR #155.
 BEGIN;
 
 CREATE TEMP TABLE expected_frontend_rpc (

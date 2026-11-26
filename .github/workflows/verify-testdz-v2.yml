@@ -122,7 +122,7 @@ jobs:
           path: Runner
           persist-credentials: false
 
-      - name: Verify 40 curated frontend RPC names, exact arguments, role boundaries, and identity isolation
+      - name: Verify 46 curated frontend RPC names, exact arguments, role boundaries, and identity isolation
         shell: bash
         working-directory: TestDZ
         run: |

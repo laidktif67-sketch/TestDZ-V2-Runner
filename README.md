@@ -5,12 +5,12 @@ A separate, disposable GitHub Actions runner for verifying one immutable, curate
 ## Current candidate
 
 - TestDZ repository: `laidktif67-sketch/TestDZ`
-- Pinned candidate commit: `9e28de22ca6511e8eb69252947d234d606e58a52`
-- Candidate integration series: PR #150 (Algerian day boundary), PR #151 (notification lifecycle), and PR #152 (Support privacy and developer feedback replies).
-- Expected SQL migrations: 23 (001–021, then 033–034). The missing migration numbers 022–032 are intentionally excluded from this curated candidate; they are not implicitly approved or part of this runner baseline.
-- Post-migration V2 contracts: 10 explicitly listed scripts. The phase-one `security_contract.sql` is run immediately after migration 006.
+- Pinned candidate commit: `b82c4c6d0ef9bfe42e1ab4502122b6e73859d43c`
+- Candidate integration series: PR #150 (Algerian day boundary), PR #151 (notification lifecycle), PR #152 (Support privacy and developer feedback replies), and PR #153 (developer monitoring, role-explicit Support, and invitations).
+- Expected SQL migrations: 26 (001–021, then 030–034). Migrations 022–029 remain intentionally excluded pending separate dependency/security review.
+- Post-migration V2 contracts: 13 explicitly listed scripts, including aggregate-monitoring privacy, role-explicit Support ticket creation, and invitation lifecycle. The phase-one `security_contract.sql` is run immediately after migration 006.
 - Frontend RPC verification: retains the 40-function curated V2 frontend RPC contract, exact named-argument checks, role-boundary checks, PostgREST exposure checks, and per-user isolation checks for session/security activity.
-- Edge Function check: notification dispatcher only.
+- Edge Function checks: notification dispatcher and developer invitations.
 
 ## Safety model
 
@@ -46,8 +46,8 @@ After the secret is saved:
 
 The workflow has two jobs:
 
-- **Database contracts:** apply all 23 pinned V2 SQL migrations to a fresh local Supabase database; run the phase-one security contract and the 10 explicitly listed post-migration contracts; then run the Runner's frontend RPC contract and representative PostgREST role/identity-isolation checks.
-- **Notification Edge Function:** type-check `supabase/functions/dispatch-notifications/index.ts` with the pinned Deno version.
+- **Database contracts:** apply all 26 pinned V2 SQL migrations to a fresh local Supabase database; run the phase-one security contract and the 13 explicitly listed post-migration contracts; then run the Runner's frontend RPC contract and representative PostgREST role/identity-isolation checks.
+- **Notification Edge Function:** type-check `supabase/functions/dispatch-notifications/index.ts` and `supabase/functions/developer-invitations/index.ts` with the pinned Deno version.
 
 ## If the workflow fails
 

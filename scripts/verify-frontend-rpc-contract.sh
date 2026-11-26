@@ -265,8 +265,13 @@ expect_status 200 "$status" "Tester can call get_discoverable_tests"
 status="$(request_status "$developer_jwt" POST "rpc/get_developer_feedback" content '{}')"
 expect_status 200 "$status" "Developer can call get_developer_feedback"
 
-status="$(request_status "$admin_jwt" POST "rpc/admin_list_pending_role_requests" content '{}')"
-expect_status 200 "$status" "Admin can call admin_list_pending_role_requests"
+# The curated candidate intentionally excludes migrations 022-032, including
+# the separate role-request administration RPCs. Verify the Admin review route
+# that is present in migration 008 instead; a missing app should reach its
+# domain-level 404, while every non-Admin role must be rejected with 403.
+review_probe='{"p_app_id":"64000000-0000-4000-8000-000000000001","p_decision":"approved","p_reason":"runner authorization probe"}'
+status="$(request_status "$admin_jwt" POST "rpc/review_app" content "$review_probe")"
+expect_status 404 "$status" "Admin reaches the review_app domain check"
 
 status="$(request_status "$financial_jwt" GET "payments?select=id&limit=0" accept '')"
 expect_status 200 "$status" "Financial role can read the payments surface"
@@ -275,17 +280,17 @@ status="$(request_status "$support_jwt" GET "support_tickets?select=id&limit=0" 
 expect_status 200 "$status" "Support role can read the support ticket surface"
 
 # Negative role boundaries: these must be rejected, not silently return data.
-status="$(request_status "$tester_jwt" POST "rpc/admin_list_pending_role_requests" content '{}')"
-expect_status 403 "$status" "Tester is denied the Admin role-request RPC"
+status="$(request_status "$tester_jwt" POST "rpc/review_app" content "$review_probe")"
+expect_status 403 "$status" "Tester is denied the Admin app-review RPC"
 
-status="$(request_status "$developer_jwt" POST "rpc/admin_list_pending_role_requests" content '{}')"
-expect_status 403 "$status" "Developer is denied the Admin role-request RPC"
+status="$(request_status "$developer_jwt" POST "rpc/review_app" content "$review_probe")"
+expect_status 403 "$status" "Developer is denied the Admin app-review RPC"
 
-status="$(request_status "$financial_jwt" POST "rpc/admin_list_pending_role_requests" content '{}')"
-expect_status 403 "$status" "Financial is denied the Admin role-request RPC"
+status="$(request_status "$financial_jwt" POST "rpc/review_app" content "$review_probe")"
+expect_status 403 "$status" "Financial is denied the Admin app-review RPC"
 
-status="$(request_status "$support_jwt" POST "rpc/admin_list_pending_role_requests" content '{}')"
-expect_status 403 "$status" "Support is denied the Admin role-request RPC"
+status="$(request_status "$support_jwt" POST "rpc/review_app" content "$review_probe")"
+expect_status 403 "$status" "Support is denied the Admin app-review RPC"
 
 status="$(request_status "$admin_jwt" POST "rpc/get_developer_feedback" content '{}')"
 expect_status 403 "$status" "Admin without Developer role is denied the Developer feedback RPC"
@@ -337,4 +342,4 @@ if [[ "$private_status" != "406" ]]; then
 fi
 echo "PASS: rebuild_v2_private remains unexposed to PostgREST"
 
-echo "PASS: all 47 frontend RPC names are covered in rebuild_v2, including per-user identity isolation checks."
+echo "PASS: all 40 curated frontend RPC names are covered in rebuild_v2, including role boundaries and per-user identity isolation checks."
